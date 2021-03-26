@@ -1,3 +1,11 @@
+import multiprocessing
+from subprocess import PIPE
+import psutil
+import PySimpleGUI as sg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from queue import PriorityQueue
+import networkx as nx
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
@@ -8,20 +16,12 @@ import time
 import matplotlib
 
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-import networkx as nx
-from queue import PriorityQueue
 
 # Packages needed for GUI
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import PySimpleGUI as sg
 
 # Memory Usage
-import psutil
-from subprocess import PIPE
 
 # Subprocess
-import multiprocessing
 
 
 class Graph:
@@ -54,7 +54,8 @@ class Graph:
     def set_graph(self, node_cnt, prb):
         graph = nx.generators.random_graphs.erdos_renyi_graph(node_cnt, prb)
         while not nx.is_connected(graph):
-            graph = nx.generators.random_graphs.erdos_renyi_graph(node_cnt, prb)
+            graph = nx.generators.random_graphs.erdos_renyi_graph(
+                node_cnt, prb)
         return graph
 
     # Create all edges, including edge between supercomps, with weight.
@@ -252,7 +253,7 @@ class Kruskal(MST):
                 self.union_by_rank(source_comp, target_comp)
 
 
-## Call subprocess to determine memory usage
+# Call subprocess to determine memory usage
 def memory_subprocess(algo_choice, nodes_count):
     assert (int(nodes_count) >= 2)
 
@@ -402,9 +403,11 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
         spread = fig_max - fig_min
         current_spread = lim[1] - lim[0]
         if horizontal:
-            center = -(spread / (scroll_max - scroll_min) * scroll_value + fig_min)
+            center = -(spread / (scroll_max - scroll_min)
+                       * scroll_value + fig_min)
         else:
-            center = spread / (scroll_max - scroll_min) * scroll_value + fig_min
+            center = spread / (scroll_max - scroll_min) * \
+                scroll_value + fig_min
         if horizontal:
             return center - current_spread / 2, center + current_spread / 2
         else:
@@ -461,9 +464,11 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             c = ClosestNode(pos)
             if choice != "":
                 if int(values["-NODES-"]) > 100:
-                    node_to_highlight = c.find_neighbor((event.xdata, event.ydata))
+                    node_to_highlight = c.find_neighbor(
+                        (event.xdata, event.ydata))
                 else:
-                    node_to_highlight = c.within_distance((event.xdata, event.ydata))
+                    node_to_highlight = c.within_distance(
+                        (event.xdata, event.ydata))
 
                 if node_to_highlight != -1:
                     edge_list = [(node_to_highlight, i) for i in choice.nodes
@@ -504,7 +509,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             dist = 0.02  # can change
             target_key = self.find_neighbor(coord)
             if ((self.pos[target_key][0] - coord[0]) ** 2 +
-                (self.pos[target_key][1] - coord[1]) ** 2) < dist:
+                    (self.pos[target_key][1] - coord[1]) ** 2) < dist:
                 return target_key
             else:
                 return -1
@@ -600,7 +605,8 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First make sure -NODES- and -EDGES- input values are correct
                 if not values["-NODES-"].isdigit() or int(values["-NODES-"]) < 2:
-                    sg.popup_ok("Node # needs to be int and not smaller than 2")
+                    sg.popup_ok(
+                        "Node # needs to be int and not smaller than 2")
                     continue
                 try:
                     probability = float(values["-EDGES-"])
@@ -655,7 +661,8 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First check graph exists to apply MST to
                 if g == "":
-                    sg.popup_ok("Please get graph first before running Kruskal")
+                    sg.popup_ok(
+                        "Please get graph first before running Kruskal")
                     continue
 
                 to_show = False  # wait for Run pressed to show MST
@@ -682,7 +689,8 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First check graph exists
                 if g == "":
-                    sg.popup_ok("Please get graph first before running Kruskal")
+                    sg.popup_ok(
+                        "Please get graph first before running Kruskal")
                     continue
 
                 to_show = True  # show graph
@@ -708,22 +716,30 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                 elif values["tabgr"] == "Analyses":
                     fig_agg = fig_agg2
                     # - 2 because first node_count value is 2 not 0
-                    nodes_p_x = list(timeData_p.keys())[:int(values["-NODES-"]) - 2]
-                    time_p_x = list(timeData_p.values())[:int(values["-NODES-"]) - 2]
+                    nodes_p_x = list(timeData_p.keys())[
+                        :int(values["-NODES-"]) - 2]
+                    time_p_x = list(timeData_p.values())[
+                        :int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_p_x, time_p_x, '-', color='green',
                              label="Prim Time")
-                    nodes_k_x = list(timeData_k.keys())[:int(values["-NODES-"]) - 2]
-                    time_k_x = list(timeData_k.values())[:int(values["-NODES-"]) - 2]
+                    nodes_k_x = list(timeData_k.keys())[
+                        :int(values["-NODES-"]) - 2]
+                    time_k_x = list(timeData_k.values())[
+                        :int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_k_x, time_k_x, '-b',
                              label="Kruskal Time")
                     ax2.set(xlabel="nodes", ylabel="time (ms)")
                     ax2.legend(loc="upper left")
 
                     if values["-SPACE-"] == True:
-                        nodes_space_p_x = list(spaceData_p.keys())[:int(values["-NODES-"]) - 2]
-                        nodes_space_k_x = list(spaceData_k.keys())[:int(values["-NODES-"]) - 2]
-                        space_p_x = list(spaceData_p.values())[:int(values["-NODES-"]) - 2]
-                        space_k_x = list(spaceData_k.values())[:int(values["-NODES-"]) - 2]
+                        nodes_space_p_x = list(spaceData_p.keys())[
+                            :int(values["-NODES-"]) - 2]
+                        nodes_space_k_x = list(spaceData_k.keys())[
+                            :int(values["-NODES-"]) - 2]
+                        space_p_x = list(spaceData_p.values())[
+                            :int(values["-NODES-"]) - 2]
+                        space_k_x = list(spaceData_k.values())[
+                            :int(values["-NODES-"]) - 2]
 
                         ax3.plot(nodes_space_p_x, space_p_x, '-', color="red",
                                  label="Prim Space")
@@ -751,7 +767,8 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             if fig_agg == fig_agg1 and redraw:
                 # Update window text field if choice != g
                 if choice != g:
-                    window["-TIMECOMP-"].update(f"Time Comp: {(end - start) * 1000:.2f}")
+                    window["-TIMECOMP-"].update(
+                        f"Time Comp: {(end - start) * 1000:.2f}")
                     window["-SPACECOMP-"].update(f"Space Comp: {peak_mem}")
 
                 # Choose layout
