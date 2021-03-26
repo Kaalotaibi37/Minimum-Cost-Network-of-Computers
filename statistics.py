@@ -30,7 +30,7 @@ for number_of_times in range(5, 55, 5):
             worst_P = time_total
         average_p += time_total
 
-        # calcuting time complexity for krystal's  algorithm
+        # calcuting time complexity for Kruskal's  algorithm
         # initialization graph
         g = m.Graph(number_of_times)
         kruskal_algothim = m.Kruskal(g)
@@ -54,6 +54,6 @@ for number_of_times in range(5, 55, 5):
 
     print("Prim algorithm \n Number of nodes : {number_of_times} \n best time complexity: {best_p} in millisecond \n worst time complexity: {worst_P} in millisecond \n avarge time complexity: {average_p} in millisecond".format(
         number_of_times=number_of_times, best_p=best_p, worst_P=worst_P, average_p=average_p))
-    print("krystal algorithm \n Number of nodes : {number_of_times} \n best time complexity: {best_k} in millisecond \n worst time complexity: {worst_k} in millisecond \n avarge time complexity: {average_k} in millisecond".format(
+    print("Kruskal algorithm \n Number of nodes : {number_of_times} \n best time complexity: {best_k} in millisecond \n worst time complexity: {worst_k} in millisecond \n avarge time complexity: {average_k} in millisecond".format(
         number_of_times=number_of_times, best_k=best_k, worst_k=worst_k, average_k=average_k))
     print("========================================================================")
