@@ -20,9 +20,6 @@ import PySimpleGUI as sg
 import psutil
 from subprocess import PIPE
 
-# Profile
-from profilehooks import profile
-
 # Subprocess
 import multiprocessing
 
@@ -64,7 +61,6 @@ class Graph:
     # Returns a list of edge tuples of format
     # (source node, target node, {'weight': weight})
     # Weight is a random integer from the interval [1, 10)
-    # @profile(immediate=True)
     def set_edges(self, graph):
 
         # Makes sure super computers are connected
@@ -126,7 +122,6 @@ class Prim(MST):
         super().__init__(instance_of_graph)
 
     # Start applying prim's algorithm
-    # @profile(immediate=True)
     def prim(self):
         # Randomly select start node from one of the supernodes
         start_node = random.choice(list(self.node_MST))
@@ -235,7 +230,6 @@ class Kruskal(MST):
                 self.rank[target_comp] += 1
 
     # Start applying kruskal's algorithm
-    # @profile(immediate=True)
     def kruskal(self):
         # First sort all edges by weight
         sorted_weights = sorted(self.edges,
@@ -258,7 +252,6 @@ class Kruskal(MST):
                 self.union_by_rank(source_comp, target_comp)
 
 
-# @profile(immediate=True)
 ## Call subprocess to determine memory usage
 def memory_subprocess(algo_choice, nodes_count):
     assert (int(nodes_count) >= 2)
@@ -387,6 +380,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
         "Minimum Cost Network of Computers for Al-Hilal Saudi Company",
         layout,
         location=(0, 0),
+        size=(800, 680),
         finalize=True,
         resizable=True,
         element_justification="center",
@@ -411,7 +405,6 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             center = -(spread / (scroll_max - scroll_min) * scroll_value + fig_min)
         else:
             center = spread / (scroll_max - scroll_min) * scroll_value + fig_min
-        print(f"center = {center}")
         if horizontal:
             return center - current_spread / 2, center + current_spread / 2
         else:
@@ -422,7 +415,70 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
         figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
         figure_canvas_agg.draw()
         figure_canvas_agg.get_tk_widget().pack(side="top", fill="both", expand=1)
+        figure_canvas_agg.mpl_connect('button_press_event', onclick)
         return figure_canvas_agg
+
+    # Matplotlib respond to mouse click
+    def onclick(event):
+        if event.button == 3:
+            ax1_xlim = ax1.get_xlim()
+            ax1_ylim = ax1.get_ylim()
+            ax1.cla()
+            ax1.set_axis_off()
+
+            ax1.set_xlim(ax1_xlim[0], ax1_xlim[1])
+            ax1.set_ylim(ax1_ylim[0], ax1_ylim[1])
+
+            # Plot graph
+            nx.draw_networkx(
+                choice.graph,
+                pos,
+                alpha=0.3,
+                width=0.5,
+                ax=ax1,
+                node_size=int(values["-NODESIZE-"]),
+                node_color="black",
+            )
+            # Plot edge weight
+            if int(values["-EDGESIZE-"]) != 0:
+                nx.draw_networkx_edge_labels(
+                    choice.graph,
+                    pos,
+                    edge_labels=choice.edge_weights,
+                    ax=ax1,
+                    font_size=int(values["-EDGESIZE-"]),
+                )
+            # Plot supernodes
+            nx.draw_networkx_nodes(
+                choice.graph,
+                pos,
+                nodelist=choice.sup_nodes,
+                node_color="lightgreen",
+                ax=ax1,
+            )
+            fig_agg.draw()
+        elif event.button == 1:
+            c = ClosestNode(pos)
+            if choice != "":
+                if int(values["-NODES-"]) > 100:
+                    node_to_highlight = c.find_neighbor((event.xdata, event.ydata))
+                else:
+                    node_to_highlight = c.within_distance((event.xdata, event.ydata))
+
+                if node_to_highlight != -1:
+                    edge_list = [(node_to_highlight, i) for i in choice.nodes
+                                 if (choice.graph.has_edge(node_to_highlight, i) and
+                                     node_to_highlight != i)]
+                    nx.draw_networkx_edges(
+                        choice.graph,
+                        pos,
+                        edgelist=edge_list,
+                        # alpha=0.1,
+                        edge_color='brown',
+                        width=2,
+                        ax=ax1,
+                    )
+                    fig_agg.draw()
 
     # Initialize figure, axes, and canvas setup
     fig1 = matplotlib.figure.Figure(figsize=(50, 40), dpi=100)
@@ -434,13 +490,32 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
     fig_agg1 = draw_figure(window["-CANVAS1-"].TKCanvas, fig1)
     fig_agg2 = draw_figure(window["-CANVAS2-"].TKCanvas, fig2)
 
-    ze = zoom_engine(ax1)
+    class ClosestNode():
+        def __init__(self, pos):
+            self.pos = pos
+
+        def find_neighbor(self, coord):
+            closest_key = min(self.pos.keys(),
+                              key=lambda c: (self.pos[c][0] - coord[0]) ** 2 +
+                                            (self.pos[c][1] - coord[1]) ** 2)
+            return closest_key
+
+        def within_distance(self, coord):
+            dist = 0.02  # can change
+            target_key = self.find_neighbor(coord)
+            if ((self.pos[target_key][0] - coord[0]) ** 2 +
+                (self.pos[target_key][1] - coord[1]) ** 2) < dist:
+                return target_key
+            else:
+                return -1
 
     # Initialize values to check for item is properly intialized in while loop and to use in while loop
-    g = ""
+    g = 0
     choice = ""
     start = 0
     end = 0
+    pos = ""
+    node_to_hightlight = -1
     fig_agg = fig_agg1
     ax1.cla()
     ax1.set_axis_off()
@@ -451,24 +526,10 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
     # Continue while loop until user presses Exit button or closes window
     while True:
 
-        print(f"after while, time is {time.time()}")
-
-        print(fig1.get_size_inches())
         # Clears axes
-        # ax1_xlim = ax1.get_xlim()
-        # ax1_ylim = ax1.get_ylim()
-        # print(ax1.get_xlim())
-        # print(ax1.get_ylim())
-
-        # ax1.set_xlim(xmin = 0, xmax = 1)#ax1_xlim[0], right = ax1_xlim[1])
-        #             xmin = ax1_xlim[0], xmax = ax1_xlim[1])
-        # ax1.set_ylim(ymin = 0, ymax = 1)#ax1_ylim[0], bottom = ax1_ylim[1])
-        #             ymin = ax1_ylim[0], ymax = ax1_ylim[1])
-        # plt.clf()
-
         ax2.cla()
         ax3.cla()
-        # print(type(ze))
+
         to_show = False
         redraw = False
         change_pos = False
@@ -491,7 +552,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                 "Node pt needs to be int and not smaller than 0. Please enter new number")
             window["-EDGESIZE-"].update(values["-EDGESIZE-"])
 
-        # When user presses Graph button
+        # When user presses Center button
         if event == "Center":
             if g == "":
                 sg.popup_ok("Please get graph first before scaling")
@@ -534,6 +595,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             ax1.set_ylim(scroll_lim(ylim, values["verti_slider"], False))
             to_show = True
             redraw = False
+        # When user presses Graph button
         elif event == "Graph":
             try:
                 # First make sure -NODES- and -EDGES- input values are correct
@@ -571,19 +633,17 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
 
                 to_show = False  # wait for Run pressed to show MST
 
-                print(f"Before peak_mem in Prim, start = {time.time()}")
                 # Call subprocess to check for peak memory usage
                 if int(nodes_count) in spaceData_p:
                     peak_mem = spaceData_p[int(nodes_count)]
                 else:
                     peak_mem = memory_subprocess("p", nodes_count)
-                print(f"After peak_mem in Prim, end = {time.time()}")
 
                 # Get MST with Prim's algorithm
                 p = Prim(g)
-                start = time.time()  # calculate time spent
+                start = time.perf_counter()  # calculate time spent
                 p.prim()
-                end = time.time()
+                end = time.perf_counter()
                 choice = p
                 window["-TYPE-"].update("Prim")
                 window["-TIMECOMP-"].update("Time Comp: O(ElogV)")
@@ -608,9 +668,9 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
 
                 # Get MST with Kruskal's algorithm
                 k = Kruskal(g)
-                start = time.time()  # calculate time spent
+                start = time.perf_counter()  # calculate time spent
                 k.kruskal()
-                end = time.time()
+                end = time.perf_counter()
                 choice = k
                 window["-TYPE-"].update("Kruskal")
                 window["-TIMECOMP-"].update("Time Comp: O(ElogE)")
@@ -647,27 +707,31 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                     fig_agg = fig_agg1
                 elif values["tabgr"] == "Analyses":
                     fig_agg = fig_agg2
-                    nodes_p_x = list(timeData_p.keys())
-                    time_p_x = list(timeData_p.values())
+                    # - 2 because first node_count value is 2 not 0
+                    nodes_p_x = list(timeData_p.keys())[:int(values["-NODES-"]) - 2]
+                    time_p_x = list(timeData_p.values())[:int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_p_x, time_p_x, '-', color='green',
                              label="Prim Time")
-                    nodes_k_x = list(timeData_k.keys())
-                    time_k_x = list(timeData_k.values())
+                    nodes_k_x = list(timeData_k.keys())[:int(values["-NODES-"]) - 2]
+                    time_k_x = list(timeData_k.values())[:int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_k_x, time_k_x, '-b',
                              label="Kruskal Time")
-                    ax2.legend()
+                    ax2.set(xlabel="nodes", ylabel="time (ms)")
+                    ax2.legend(loc="upper left")
 
                     if values["-SPACE-"] == True:
-                        nodes_space_p_x = list(spaceData_p.keys())
-                        nodes_space_k_x = list(spaceData_k.keys())
-                        space_p_x = list(spaceData_p.values())
-                        space_k_x = list(spaceData_k.values())
+                        nodes_space_p_x = list(spaceData_p.keys())[:int(values["-NODES-"]) - 2]
+                        nodes_space_k_x = list(spaceData_k.keys())[:int(values["-NODES-"]) - 2]
+                        space_p_x = list(spaceData_p.values())[:int(values["-NODES-"]) - 2]
+                        space_k_x = list(spaceData_k.values())[:int(values["-NODES-"]) - 2]
 
                         ax3.plot(nodes_space_p_x, space_p_x, '-', color="red",
                                  label="Prim Space")
                         ax3.plot(nodes_space_k_x, space_k_x, '-', color="brown",
                                  label="Kruskal Space")
-                        ax3.legend()
+                        ax3.legend(loc=1)
+                        ax3.set(ylabel="time (ms)")
+
                     to_show = True
             except:
                 pass
@@ -683,8 +747,6 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
 
         # If set to show graph / MST
         if to_show:
-
-            print(f"start draw at {time.time()}")
 
             if fig_agg == fig_agg1 and redraw:
                 # Update window text field if choice != g
@@ -736,12 +798,9 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                     )
 
             # Add the plot to the window
-            print(ax1.get_xlim())
             fig_agg.draw()
-            print(f"end draw at {time.time()}")
 
 
-# @profile(immediate=True)
 def command_line_access():
     """
     For command line access to be used by program to calculate peak memory usage.
@@ -790,8 +849,6 @@ def command_line_access():
 
 def collectData(timeData_p, spaceData_p, timeData_k, spaceData_k,
                 node_count=100):
-    start = time.time()
-
     # Loop through node_count, then go through algo choice 'P' & 'K'
     # Smallest node_count available is 2
     for n in range(2, node_count):
@@ -799,76 +856,22 @@ def collectData(timeData_p, spaceData_p, timeData_k, spaceData_k,
         g = Graph(n)
 
         p = Prim(g)
-        start_p = time.time()
+        start_p = time.perf_counter()
         p.prim()
-        end_p = time.time()
+        end_p = time.perf_counter()
         timeData_p[n] = end_p - start_p
 
         k = Kruskal(g)
-        start_k = time.time()
+        start_k = time.perf_counter()
         k.kruskal()
-        end_k = time.time()
+        end_k = time.perf_counter()
         timeData_k[n] = end_k - start_k
 
         # Then test for memory
         spaceData_p[n] = memory_subprocess("P", n)
         spaceData_k[n] = memory_subprocess("K", n)
 
-    end = time.time()
-
     return timeData_p, spaceData_p, timeData_k, spaceData_k
-
-
-def zoom_engine(ax, scale=1.1):
-    def zoom_func(event):
-        # Get the present x and y limits
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-
-        # Get event location
-        xdata = event.xdata  # get event x location
-        ydata = event.ydata  # get event y location
-        print(f"xdata = {xdata}")
-        print(f"ydata = {ydata}")
-
-        # Get distance from cursor to edge of figure frame
-        x_left = xdata - xlim[0]
-        x_right = xlim[1] - xdata
-        y_top = ydata - ylim[0]
-        y_bottom = ylim[1] - ydata
-
-        if event.button == 'up':
-            # Zoom in
-            scale_factor = 1 / scale
-        elif event.button == 'down':
-            # Zoom out
-            scale_factor = scale
-        else:
-            # Something that should never happen
-            scale_factor = 1
-            print(event.button)
-
-        print(f"x_left = {x_left}")
-        print(f"x_right = {x_right}")
-        print(f"y_top = {y_top}")
-        print(f"y_bottom = {y_bottom}")
-        print(f"scale_factor = {scale_factor}")
-
-        # Set new limits
-        ax.set_xlim([xdata - x_left * scale_factor,
-                     xdata + x_right * scale_factor])
-        ax.set_ylim([ydata - y_top * scale_factor,
-                     ydata + y_bottom * scale_factor])
-        print(f"after set_xlim, ax.get_xlim = {ax.get_xlim()}")
-        print(f"after set_ylim, ax.get_ylim = {ax.get_ylim()}")
-
-        ax.figure.canvas.draw_idle()  # force re-draw the next time the GUI refreshes
-
-    fig = ax.get_figure()  # get the figure of interest
-    # Attach the call back
-    fig.canvas.mpl_connect('scroll_event', zoom_func)
-
-    return zoom_func
 
 
 if __name__ == "__main__":
@@ -887,7 +890,7 @@ if __name__ == "__main__":
                                         spaceData_p,
                                         timeData_k,
                                         spaceData_k,
-                                        100,
+                                        500,
                                     ))
         p.start()
 
