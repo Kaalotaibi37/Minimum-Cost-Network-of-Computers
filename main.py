@@ -1,11 +1,3 @@
-import multiprocessing
-from subprocess import PIPE
-import psutil
-import PySimpleGUI as sg
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from queue import PriorityQueue
-import networkx as nx
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
@@ -16,12 +8,20 @@ import time
 import matplotlib
 
 matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+import networkx as nx
+from queue import PriorityQueue
 
 # Packages needed for GUI
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import PySimpleGUI as sg
 
 # Memory Usage
+import psutil
+from subprocess import PIPE
 
 # Subprocess
+import multiprocessing
 
 
 class Graph:
@@ -54,8 +54,7 @@ class Graph:
     def set_graph(self, node_cnt, prb):
         graph = nx.generators.random_graphs.erdos_renyi_graph(node_cnt, prb)
         while not nx.is_connected(graph):
-            graph = nx.generators.random_graphs.erdos_renyi_graph(
-                node_cnt, prb)
+            graph = nx.generators.random_graphs.erdos_renyi_graph(node_cnt, prb)
         return graph
 
     # Create all edges, including edge between supercomps, with weight.
@@ -253,7 +252,7 @@ class Kruskal(MST):
                 self.union_by_rank(source_comp, target_comp)
 
 
-# Call subprocess to determine memory usage
+## Call subprocess to determine memory usage
 def memory_subprocess(algo_choice, nodes_count):
     assert (int(nodes_count) >= 2)
 
@@ -403,11 +402,9 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
         spread = fig_max - fig_min
         current_spread = lim[1] - lim[0]
         if horizontal:
-            center = -(spread / (scroll_max - scroll_min)
-                       * scroll_value + fig_min)
+            center = -(spread / (scroll_max - scroll_min) * scroll_value + fig_min)
         else:
-            center = spread / (scroll_max - scroll_min) * \
-                scroll_value + fig_min
+            center = spread / (scroll_max - scroll_min) * scroll_value + fig_min
         if horizontal:
             return center - current_spread / 2, center + current_spread / 2
         else:
@@ -418,72 +415,136 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
         figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
         figure_canvas_agg.draw()
         figure_canvas_agg.get_tk_widget().pack(side="top", fill="both", expand=1)
-        figure_canvas_agg.mpl_connect('button_press_event', onclick)
+        cid1 = figure_canvas_agg.mpl_connect('scroll_event', click_zoom)
+        cid0 = figure_canvas_agg.mpl_connect('button_press_event', onclick)
         return figure_canvas_agg
+
+    def click_zoom(event):
+
+        scale = 1.05
+
+        if g != 0 and values["tabgr"] == "Graphs":
+            # Get the present x and y limits
+            xlim = ax1.get_xlim()
+            ylim = ax1.get_ylim()
+
+            # Get event location
+            xdata = event.xdata  # get event x location
+            ydata = event.ydata  # get event y location
+
+            # Get distance from cursor to edge of figure frame
+            if (xdata is not None) and (ydata is not None):
+                x_left = xdata - xlim[0]
+                x_right = xlim[1] - xdata
+                y_top = ydata - ylim[0]
+                y_bottom = ylim[1] - ydata
+
+                if event.button == 'up':
+                    # Zoom in
+                    scale_factor = 1 / scale
+                elif event.button == 'down':
+                    # Zoom out
+                    scale_factor = scale
+                else:
+                    # Something that should never happen
+                    scale_factor = 1
+
+                # Set new limits
+                ax1.set_xlim([xdata - x_left * scale_factor,
+                              xdata + x_right * scale_factor])
+                ax1.set_ylim([ydata - y_top * scale_factor,
+                              ydata + y_bottom * scale_factor])
+
+                ax1.figure.canvas.draw_idle()  # force re-draw the next time the GUI refreshes
+
+            return 0
 
     # Matplotlib respond to mouse click
     def onclick(event):
-        if event.button == 3:
-            ax1_xlim = ax1.get_xlim()
-            ax1_ylim = ax1.get_ylim()
-            ax1.cla()
-            ax1.set_axis_off()
+        if g != 0 and values["tabgr"] == "Graphs":
+            if event.button == 3:
+                ax1_xlim = ax1.get_xlim()
+                ax1_ylim = ax1.get_ylim()
+                ax1.cla()
+                ax1.set_axis_off()
 
-            ax1.set_xlim(ax1_xlim[0], ax1_xlim[1])
-            ax1.set_ylim(ax1_ylim[0], ax1_ylim[1])
+                ax1.set_xlim(ax1_xlim[0], ax1_xlim[1])
+                ax1.set_ylim(ax1_ylim[0], ax1_ylim[1])
 
-            # Plot graph
-            nx.draw_networkx(
-                choice.graph,
-                pos,
-                alpha=0.3,
-                width=0.5,
-                ax=ax1,
-                node_size=int(values["-NODESIZE-"]),
-                node_color="black",
-            )
-            # Plot edge weight
-            if int(values["-EDGESIZE-"]) != 0:
-                nx.draw_networkx_edge_labels(
+                # Plot graph
+                nx.draw_networkx(
                     choice.graph,
                     pos,
-                    edge_labels=choice.edge_weights,
+                    alpha=0.3,
+                    width=0.5,
                     ax=ax1,
-                    font_size=int(values["-EDGESIZE-"]),
+                    node_size=int(values["-NODESIZE-"]),
+                    node_color="black",
                 )
-            # Plot supernodes
-            nx.draw_networkx_nodes(
-                choice.graph,
-                pos,
-                nodelist=choice.sup_nodes,
-                node_color="lightgreen",
-                ax=ax1,
-            )
-            fig_agg.draw()
-        elif event.button == 1:
-            c = ClosestNode(pos)
-            if choice != "":
-                if int(values["-NODES-"]) > 100:
-                    node_to_highlight = c.find_neighbor(
-                        (event.xdata, event.ydata))
-                else:
-                    node_to_highlight = c.within_distance(
-                        (event.xdata, event.ydata))
-
-                if node_to_highlight != -1:
-                    edge_list = [(node_to_highlight, i) for i in choice.nodes
-                                 if (choice.graph.has_edge(node_to_highlight, i) and
-                                     node_to_highlight != i)]
+                # Plot edge weight
+                if int(values["-EDGESIZE-"]) != 0:
+                    nx.draw_networkx_edge_labels(
+                        choice.graph,
+                        pos,
+                        edge_labels=choice.edge_weights,
+                        ax=ax1,
+                        font_size=int(values["-EDGESIZE-"]),
+                    )
+                # Plot supernodes
+                nx.draw_networkx_nodes(
+                    choice.graph,
+                    pos,
+                    nodelist=choice.sup_nodes,
+                    node_color="lightgreen",
+                    ax=ax1,
+                )
+                # Plot MST
+                if choice != g:  # choice is MST
                     nx.draw_networkx_edges(
                         choice.graph,
                         pos,
-                        edgelist=edge_list,
+                        edgelist=list(choice.edge_MST),
                         # alpha=0.1,
-                        edge_color='brown',
+                        edge_color='g',
                         width=2,
                         ax=ax1,
                     )
-                    fig_agg.draw()
+
+                fig_agg.draw()
+            elif event.button == 1:
+                if ((pos != "") and (choice != "") and
+                        (event.xdata is not None) and
+                        (event.ydata is not None)):
+
+                    c = ClosestNode(pos)
+                    if int(values["-NODES-"]) > 100:
+                        node_to_highlight = c.find_neighbor((event.xdata, event.ydata))
+                    else:
+                        node_to_highlight = c.within_distance((event.xdata, event.ydata))
+
+                    if node_to_highlight != -1:
+                        if choice == g:
+                            edge_list = [(node_to_highlight, i)
+                                         for i in choice.nodes
+                                         if (choice.graph.has_edge(
+                                    node_to_highlight, i) and
+                                             node_to_highlight != i)]
+                        else:
+                            edge_list = [(node_to_highlight, i)
+                                         for i in choice.node_MST
+                                         if (tuple(sorted((node_to_highlight,
+                                                           i))) in choice.edge_MST and node_to_highlight != i)]
+                        nx.draw_networkx_edges(
+                            choice.graph,
+                            pos,
+                            edgelist=edge_list,
+                            # alpha=0.1,
+                            edge_color='brown',
+                            width=2,
+                            ax=ax1,
+                        )
+                        fig_agg.draw()
+            return 0
 
     # Initialize figure, axes, and canvas setup
     fig1 = matplotlib.figure.Figure(figsize=(50, 40), dpi=100)
@@ -509,7 +570,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             dist = 0.02  # can change
             target_key = self.find_neighbor(coord)
             if ((self.pos[target_key][0] - coord[0]) ** 2 +
-                    (self.pos[target_key][1] - coord[1]) ** 2) < dist:
+                (self.pos[target_key][1] - coord[1]) ** 2) < dist:
                 return target_key
             else:
                 return -1
@@ -605,8 +666,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First make sure -NODES- and -EDGES- input values are correct
                 if not values["-NODES-"].isdigit() or int(values["-NODES-"]) < 2:
-                    sg.popup_ok(
-                        "Node # needs to be int and not smaller than 2")
+                    sg.popup_ok("Node # needs to be int and not smaller than 2")
                     continue
                 try:
                     probability = float(values["-EDGES-"])
@@ -661,8 +721,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First check graph exists to apply MST to
                 if g == "":
-                    sg.popup_ok(
-                        "Please get graph first before running Kruskal")
+                    sg.popup_ok("Please get graph first before running Kruskal")
                     continue
 
                 to_show = False  # wait for Run pressed to show MST
@@ -689,8 +748,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             try:
                 # First check graph exists
                 if g == "":
-                    sg.popup_ok(
-                        "Please get graph first before running Kruskal")
+                    sg.popup_ok("Please get graph first before running Kruskal")
                     continue
 
                 to_show = True  # show graph
@@ -716,30 +774,22 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                 elif values["tabgr"] == "Analyses":
                     fig_agg = fig_agg2
                     # - 2 because first node_count value is 2 not 0
-                    nodes_p_x = list(timeData_p.keys())[
-                        :int(values["-NODES-"]) - 2]
-                    time_p_x = list(timeData_p.values())[
-                        :int(values["-NODES-"]) - 2]
+                    nodes_p_x = list(timeData_p.keys())[:int(values["-NODES-"]) - 2]
+                    time_p_x = list(timeData_p.values())[:int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_p_x, time_p_x, '-', color='green',
                              label="Prim Time")
-                    nodes_k_x = list(timeData_k.keys())[
-                        :int(values["-NODES-"]) - 2]
-                    time_k_x = list(timeData_k.values())[
-                        :int(values["-NODES-"]) - 2]
+                    nodes_k_x = list(timeData_k.keys())[:int(values["-NODES-"]) - 2]
+                    time_k_x = list(timeData_k.values())[:int(values["-NODES-"]) - 2]
                     ax2.plot(nodes_k_x, time_k_x, '-b',
                              label="Kruskal Time")
                     ax2.set(xlabel="nodes", ylabel="time (ms)")
                     ax2.legend(loc="upper left")
 
                     if values["-SPACE-"] == True:
-                        nodes_space_p_x = list(spaceData_p.keys())[
-                            :int(values["-NODES-"]) - 2]
-                        nodes_space_k_x = list(spaceData_k.keys())[
-                            :int(values["-NODES-"]) - 2]
-                        space_p_x = list(spaceData_p.values())[
-                            :int(values["-NODES-"]) - 2]
-                        space_k_x = list(spaceData_k.values())[
-                            :int(values["-NODES-"]) - 2]
+                        nodes_space_p_x = list(spaceData_p.keys())[:int(values["-NODES-"]) - 2]
+                        nodes_space_k_x = list(spaceData_k.keys())[:int(values["-NODES-"]) - 2]
+                        space_p_x = list(spaceData_p.values())[:int(values["-NODES-"]) - 2]
+                        space_k_x = list(spaceData_k.values())[:int(values["-NODES-"]) - 2]
 
                         ax3.plot(nodes_space_p_x, space_p_x, '-', color="red",
                                  label="Prim Space")
@@ -767,8 +817,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             if fig_agg == fig_agg1 and redraw:
                 # Update window text field if choice != g
                 if choice != g:
-                    window["-TIMECOMP-"].update(
-                        f"Time Comp: {(end - start) * 1000:.2f}")
+                    window["-TIMECOMP-"].update(f"Time Comp: {(end - start) * 1000:.2f}")
                     window["-SPACECOMP-"].update(f"Space Comp: {peak_mem}")
 
                 # Choose layout
