@@ -335,8 +335,46 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             ]
     tab3_layout = [
             [
+            sg.Text("Node #", size=(8, 1)),
+            sg.In("6", size=(5, 1), enable_events=True, key="-NODECHART-"),
             sg.Checkbox("Best", default=False, key="-BEST-"),
+            sg.Checkbox("Average", default=True, key="-AVERAGE-"),
             sg.Checkbox("Worst", default=False, key="-WORST-"),
+            sg.Text("Algo #", size=(8, 1)),
+            sg.In("10", size=(5, 1), enable_events=True, key="-ALGONUM-"),
+            sg.Button("Start"),#, enable_events=True, key="Start"),
+            ],
+            [
+            sg.Text(
+                "K Worst:     ",
+                size=(20, 1),
+                key="-WORSTTIMEK-",
+            ),
+            sg.Text(
+                "K Avg:   ",
+                size=(20, 1),
+                key="-AVERAGETIMEK-",
+            ),
+            sg.Text(
+                "K Best:   ",
+                size=(20, 1),
+                key="-BESTTIMEK-",
+            ),
+            sg.Text(
+                "P Worst:     ",
+                size=(20, 1),
+                key="-WORSTTIMEP-",
+            ),
+            sg.Text(
+                "P Avg:   ",
+                size=(20, 1),
+                key="-AVERAGETIMEP-",
+            ),
+            sg.Text(
+                "P Best:   ",
+                size=(20, 1),
+                key="-BESTTIMEP-",
+            ),
             ],
             [sg.Canvas(key="-CANVAS3-")],
             ]
@@ -556,6 +594,12 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                         fig_agg.draw()
             return 0
 
+    def test_not_smaller_than_zero(target):
+        while (values[target] is None) or (not values[target].isdigit()) or (int(values[target]) < 0):
+            values[target] = sg.popup_get_text(
+                "Node pt needs to be int and not smaller than 0. Please enter new number")
+            window[target].update(values[target])
+
     # Initialize figure, axes, and canvas setup
     fig1 = matplotlib.figure.Figure(figsize=(50, 40), dpi=100)
     ax1 = fig1.add_subplot(111)
@@ -594,8 +638,14 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
     start = 0
     end = 0
     pos = ""
+    timeChartData_p = multiprocessing.Manager().dict()
+    spaceChartData_p = multiprocessing.Manager().dict()
+    timeChartData_k = multiprocessing.Manager().dict()
+    spaceChartData_k = multiprocessing.Manager().dict()
+    
     node_to_hightlight = -1
     fig_agg = fig_agg1
+    chart_p = ""
     ax1.cla()
     ax1.set_axis_off()
     
@@ -619,18 +669,14 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
 
         if event == "Exit" or event == sg.WIN_CLOSED:
             data_p.terminate()
+            if chart_p != "": chart_p.terminate()
             window.close()
             break
 
-        while (values["-NODESIZE-"] is None) or (not values["-NODESIZE-"].isdigit()) or (int(values["-NODESIZE-"]) < 0):
-            values["-NODESIZE-"] = sg.popup_get_text(
-                "Node pt needs to be int and not smaller than 0. Please enter new number")
-            window["-NODESIZE-"].update(values["-NODESIZE-"])
-
-        while (values["-EDGESIZE-"] is None) or (not values["-EDGESIZE-"].isdigit()) or (int(values["-EDGESIZE-"]) < 0):
-            values["-EDGESIZE-"] = sg.popup_get_text(
-                "Node pt needs to be int and not smaller than 0. Please enter new number")
-            window["-EDGESIZE-"].update(values["-EDGESIZE-"])
+        test_not_smaller_than_zero("-NODESIZE-")
+        test_not_smaller_than_zero("-EDGESIZE-")
+        test_not_smaller_than_zero("-NODECHART-")
+        test_not_smaller_than_zero("-ALGONUM-")
 
         # When user presses Center button
         if event == "Center":
@@ -819,43 +865,86 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
             elif values["tabgr"] == "Analyses2":
                 fig_agg = fig_agg3
                 to_show = True
-                
+               
+                node_count = 500
+                algo_cnt = int(values["-ALGONUM-"])
+                only_time = True
+
                 # - 2 because first node_count value is 2 not 0
-                nodes_p_x = list(timeData_p.keys())[:int(values["-NODES-"]) - 2]
-                time_p_x = list(timeData_p.values())[:int(values["-NODES-"]) - 2]
-                time_mean_p_x = [sum(row) / len(row) for row in time_p_x]
+                if len(timeChartData_p) >= 1 and len(timeChartData_k) >= 1:
+                    n_c = int(values["-NODECHART-"]) - 2
+                    nodes_p_x = list(timeChartData_p.keys())[:n_c]
+                    time_p_x = list(timeChartData_p.values())[:n_c]
 
-                ax4.plot(nodes_p_x, time_mean_p_x, '-', color='orange', 
-                        label="Prim Time")
+                    nodes_k_x = list(timeChartData_k.keys())[:n_c]
+                    time_k_x = list(timeChartData_k.values())[:n_c]
 
-                nodes_k_x = list(timeData_k.keys())[:int(values["-NODES-"]) - 2]
-                time_k_x = list(timeData_k.values())[:int(values["-NODES-"]) - 2]
-                time_mean_k_x = [sum(row) / len(row) for row in time_k_x]
+                    ax4.set(xlabel="nodes", ylabel="time (ms)")
 
-                ax4.plot(nodes_k_x, time_mean_k_x, '-b', 
-                        label="Kruskal Time")
-                ax4.set(xlabel="nodes", ylabel="time (ms)")
-
-                if values["-BEST-"] == True:
                     time_best_p_x = [min(row) for row in time_p_x]
                     time_best_k_x = [min(row) for row in time_k_x]
 
-                    ax4.plot(nodes_p_x, time_best_p_x, '-', color='yellow',
-                            label="Prim Best Time")
-                    ax4.plot(nodes_k_x, time_best_k_x, '-', color="green",                             label="Kruskal Best Time")
+                    if len(time_best_k_x) >= n_c:
+                        window["-BESTTIMEK-"].update(
+                          f"K Best: {time_best_k_x[n_c - 1] * 1000:.5f}")
+                    if len(time_best_p_x) >= n_c:
+                        window["-BESTTIMEP-"].update(
+                          f"P Best: {time_best_p_x[n_c - 1] * 1000:.5f}")
 
-                if values["-WORST-"] == True:
+                    if values["-BEST-"] == True:
+                        ax4.plot(nodes_p_x, time_best_p_x, '-', color='yellow',
+                                label="Prim Best Time")
+                        ax4.plot(nodes_k_x, time_best_k_x, '-', color="green",                             label="Kruskal Best Time")
+
+                    time_mean_p_x = [sum(row) / len(row) for row in time_p_x]
+                    time_mean_k_x = [sum(row) / len(row) for row in time_k_x]
+
+                    if len(time_mean_k_x) >= n_c:
+                        window["-AVERAGETIMEK-"].update(
+                            f"K Avg: {time_mean_k_x[n_c - 1] * 1000:.5f}")
+                    if len(time_mean_p_x) >= n_c:
+                        window["-AVERAGETIMEP-"].update(
+                            f"P Avg: {time_mean_p_x[n_c - 1] * 1000:.5f}")
+                
+                    if values["-AVERAGE-"] == True:
+                        ax4.plot(nodes_p_x, time_mean_p_x, '-', color='orange',                             label="Prim Average Time")
+                        ax4.plot(nodes_k_x, time_mean_k_x, '-b', 
+                            label="Kruskal Average Time")
+
                     time_worst_p_x = [max(row) for row in time_p_x]
                     time_worst_k_x = [max(row) for row in time_k_x]
 
-                    ax4.plot(nodes_p_x, time_worst_p_x, '-', color='red',
-                            label="Prim Worst Time")
-                    ax4.plot(nodes_k_x, time_worst_k_x, '-', color="purple"                             , label="Kruskal Worst Time")
+                    if len(time_worst_k_x) >= n_c:
+                        window["-WORSTTIMEK-"].update(
+                            f"K Worst: {time_worst_k_x[n_c - 1] * 1000:.5f}")
+                    if len(time_worst_p_x) >= n_c:
+                        window["-WORSTTIMEP-"].update(
+                            f"P Worst: {time_worst_p_x[n_c - 1] * 1000:.5f}")
                 
-                ax4.legend(loc="upper left")
+                    if values["-WORST-"] == True:
+                        ax4.plot(nodes_p_x, time_worst_p_x, '-', color='red',
+                                label="Prim Worst Time")
+                        ax4.plot(nodes_k_x, time_worst_k_x, '-', color="purple"                             , label="Kruskal Worst Time")
+                     
+                    ax4.legend(loc="upper left")
 
             #except:
             #    pass
+        elif event == "Start":
+            if chart_p != "": chart_p.terminate()
+            chart_p = multiprocessing.Process(name='daemon_chart',
+                                        target=collectData, 
+                                        args=(
+                                              timeChartData_p,
+                                              spaceChartData_p,
+                                              timeChartData_k,
+                                              spaceChartData_k,
+                                              algo_cnt,
+                                              node_count,
+                                              only_time,
+                                              ))
+            chart_p.start()
+ 
 
         if redraw:
             ax1_xlim = ax1.get_xlim()
@@ -983,7 +1072,7 @@ def kruskal_count_time(k):
     
 
 def collectData(timeData_p, spaceData_p, timeData_k, spaceData_k, 
-                 node_count = 100, calc_count = 1):
+                 algo_cnt = 1, node_count = 100, only_time = False):
 
     # Loop through node_count, then go through algo choice 'P' & 'K'
     # Smallest node_count available is 2
@@ -993,20 +1082,21 @@ def collectData(timeData_p, spaceData_p, timeData_k, spaceData_k,
 
         p = Prim(g)
         result_p = []
-        for c in range(calc_count):
+        for c in range(algo_cnt):
             result_p.append(prim_count_time(p))
             timeData_p[n] = result_p
 
         k = Kruskal(g)
         result_k = []
         timeData_k[n] = []
-        for c in range(calc_count):
+        for c in range(algo_cnt):
             result_k.append(kruskal_count_time(k))
             timeData_k[n] = result_k
 
-        # Then test for memory
-        spaceData_p[n] = memory_subprocess("P", n)
-        spaceData_k[n] = memory_subprocess("K", n)
+        if not only_time:
+            # Then test for memory
+            spaceData_p[n] = memory_subprocess("P", n)
+            spaceData_k[n] = memory_subprocess("K", n)
 
     return timeData_p, spaceData_p, timeData_k, spaceData_k
 
@@ -1015,10 +1105,12 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
        
+        node_count = 500
         timeData_p = multiprocessing.Manager().dict()
         spaceData_p = multiprocessing.Manager().dict()
         timeData_k = multiprocessing.Manager().dict()
         spaceData_k = multiprocessing.Manager().dict()
+        algo_cnt = 1
 
         p = multiprocessing.Process(name='daemon',
                                     target=collectData, 
@@ -1027,8 +1119,8 @@ if __name__ == "__main__":
                                           spaceData_p,
                                           timeData_k,
                                           spaceData_k,
-                                          500,
-                                          20,
+                                          algo_cnt,
+                                          node_count,
                                           ))
         p.start()
         
@@ -1036,3 +1128,5 @@ if __name__ == "__main__":
 
     else:
         command_line_access()
+        
+      
