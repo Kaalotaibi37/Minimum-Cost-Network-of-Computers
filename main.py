@@ -34,19 +34,17 @@ class Graph:
     Arg:
         node_cnt: number of nodes to include in graph. >= 2.
         prb: probability threshold that an edge will be generated.
-        sup_cnt: number of supercomputers. Defaults to 2.
+        sup_cnt: number of supercomputers. Changed to only accept 2, see assert..
     """
 
     # node_cnt defined by user
-    # Probability defaults to 0.5; supercomputer count defaults to 2
+    # Probability defaults to 0.5; supercomputer count changed to only accept 2, see assert
     def __init__(self, node_cnt, prb=0.5, sup_cnt=2):
         if node_cnt < 2:
             raise ValueError("Graph node count cannot be smaller than 2")
         self.node_cnt = node_cnt
         self.graph = self.set_graph(node_cnt, prb)
         self.nodes = list(self.graph.nodes)
-        # Select two random supercomputer node from available nodes
-        self.sup_nodes = random.sample(self.nodes, sup_cnt)
         self.edges = self.set_edges(self.graph)
         self.edge_weights = nx.get_edge_attributes(self.graph, 'weight')
 
@@ -57,17 +55,11 @@ class Graph:
             graph = nx.generators.random_graphs.erdos_renyi_graph(node_cnt, prb)
         return graph
 
-    # Create all edges, including edge between supercomps, with weight.
+    # Create all edges with weight.
     # Returns a list of edge tuples of format
     # (source node, target node, {'weight': weight})
     # Weight is a random integer from the interval [1, 10)
     def set_edges(self, graph):
-
-        # Makes sure super computers are connected
-        for sup_node_pair in [(i, j) for i in self.sup_nodes
-                              for j in self.sup_nodes if j > i]:
-            if not graph.has_edge(*sup_node_pair):
-                graph.add_edge(*sup_node_pair)
 
         for e in graph.edges():
             graph[e[0]][e[1]]['weight'] = random.randint(1, 10)
@@ -86,11 +78,12 @@ class MST:
         instance_of_graph: an instance of the Graph class, upon which the MST is generated.
     """
 
-    def __init__(self, instance_of_graph):
+    def __init__(self, instance_of_graph, sup_cnt = 2):
         self.node_cnt = instance_of_graph.node_cnt
         self.graph = instance_of_graph.graph
         self.nodes = instance_of_graph.nodes
-        self.sup_nodes = instance_of_graph.sup_nodes
+        # Select two random supercomputer node from available nodes
+        self.sup_nodes = self.set_sup_nodes(sup_cnt)
         self.edges = instance_of_graph.edges
         self.edge_weights = instance_of_graph.edge_weights
 
@@ -102,6 +95,15 @@ class MST:
         for sup_node_pair in [(i, j) for i in self.sup_nodes
                               for j in self.sup_nodes if j > i]:
             self.edge_MST.add(sup_node_pair)
+
+    def set_sup_nodes(self, sup_cnt):
+
+        assert(sup_cnt == 2)
+        sup_nodes = random.sample(self.nodes, sup_cnt)
+        while not self.graph.has_edge(sup_nodes[0], sup_nodes[1]):
+            sup_nodes = random.sample(self.nodes, sup_cnt)
+
+        return sup_nodes
 
 
 class Prim(MST):
@@ -537,15 +539,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                         ax=ax1,
                         font_size=int(values["-EDGESIZE-"]),
                     )
-                # Plot supernodes
-                nx.draw_networkx_nodes(
-                    choice.graph,
-                    pos,
-                    nodelist=choice.sup_nodes,
-                    node_color="lightgreen",
-                    ax=ax1,
-                )
-                # Plot MST
+               # Plot MST
                 if choice != g:  # choice is MST
                     nx.draw_networkx_edges(
                         choice.graph,
@@ -556,8 +550,15 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                         width=2,
                         ax=ax1,
                     )
-
-
+                    # Plot supernodes
+                    nx.draw_networkx_nodes(
+                        choice.graph,
+                        pos,
+                        nodelist=choice.sup_nodes,
+                        node_color="lightgreen",
+                        ax=ax1,
+                    )
+     
                 fig_agg.draw()
             elif event.button == 1:
                 if ((pos != "") and (choice != "") and 
@@ -987,15 +988,7 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                         ax=ax1,
                         font_size=int(values["-EDGESIZE-"]),
                     )
-                # Plot supernodes
-                nx.draw_networkx_nodes(
-                    choice.graph,
-                    pos,
-                    nodelist=choice.sup_nodes,
-                    node_color="lightgreen",
-                    ax=ax1,
-                )
-                # Plot MST
+               # Plot MST
                 if choice != g:  # choice is MST
                     nx.draw_networkx_edges(
                         choice.graph,
@@ -1006,7 +999,15 @@ def start_GUI(timeData_p, spaceData_p, timeData_k, spaceData_k, data_p):
                         width=2,
                         ax=ax1,
                     )
-
+                    # Plot supernodes
+                    nx.draw_networkx_nodes(
+                        choice.graph,
+                        pos,
+                        nodelist=choice.sup_nodes,
+                        node_color="lightgreen",
+                        ax=ax1,
+                    )
+     
             # Add the plot to the window
             fig_agg.draw()
 
@@ -1128,5 +1129,5 @@ if __name__ == "__main__":
 
     else:
         command_line_access()
-        
-      
+
+
